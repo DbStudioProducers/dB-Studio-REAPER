@@ -9,7 +9,7 @@
 namespace {
 void require(const bool condition, const char* message) {
     if (!condition) {
-        std::cerr << "FAIL: " << message << '\\n';
+        std::cerr << "FAIL: " << message << '\n';
         std::exit(EXIT_FAILURE);
     }
 }
@@ -64,6 +64,6 @@ int main() {
     require(!router.process(input, output, missing_source), "reject active route with null source");
     require(output_samples[4][0] == 42.0F, "invalid block leaves output untouched");
 
-    std::cout << "All channel router tests passed\\n";
+    std::cout << "All channel router tests passed\n";
     return EXIT_SUCCESS;
 }
