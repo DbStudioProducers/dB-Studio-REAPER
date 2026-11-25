@@ -20,13 +20,26 @@ bool ChannelRouter::process(const AudioBlockView& input,
                             AuxOutputBlockView& output,
                             const RoutingMatrix& routing) const noexcept {
     if (input.frame_count == 0 || output.frame_count != input.frame_count ||
-        input.sample_rate_hz <= 0.0 || output.sample_rate_hz != input.sample_rate_hz) {
+        !std::isfinite(input.sample_rate_hz) || input.sample_rate_hz <= 0.0 ||
+        output.sample_rate_hz != input.sample_rate_hz) {
         return false;
     }
 
     for (float* channel : output.channels) {
         if (channel == nullptr) {
             return false;
+        }
+    }
+
+    // Validate every active source before touching output. A malformed block
+    // therefore cannot leave a partially rendered AUX frame behind.
+    for (std::size_t aux = 0; aux < kAuxBuses; ++aux) {
+        for (std::size_t source = 0; source < kInputChannels; ++source) {
+            const auto route = routing.gains[aux][source];
+            if ((route.left != 0.0F || route.right != 0.0F) &&
+                input.channels[source] == nullptr) {
+                return false;
+            }
         }
     }
 
@@ -45,11 +58,8 @@ bool ChannelRouter::process(const AudioBlockView& input,
             if (route.left == 0.0F && route.right == 0.0F) {
                 continue;
             }
-            const float* const samples = input.channels[source];
-            if (samples == nullptr) {
-                return false;
-            }
 
+            const float* const samples = input.channels[source];
             for (std::size_t frame = 0; frame < input.frame_count; ++frame) {
                 const float sample = samples[frame];
                 left[frame] += sample * route.left;
