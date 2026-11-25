@@ -4,11 +4,12 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 
 namespace {
 void require(const bool condition, const char* message) {
     if (!condition) {
-        std::cerr << "FAIL: " << message << '\n';
+        std::cerr << "FAIL: " << message << '\\n';
         std::exit(EXIT_FAILURE);
     }
 }
@@ -53,10 +54,16 @@ int main() {
     malformed.frame_count = 0;
     require(!router.process(malformed, output, matrix), "reject zero-frame block");
 
+    malformed = input;
+    malformed.sample_rate_hz = std::numeric_limits<double>::infinity();
+    require(!router.process(malformed, output, matrix), "reject non-finite sample rate");
+
     RoutingMatrix missing_source{};
     require(missing_source.setRoute(7, 2, 1.0F, 1.0F), "configure route with absent source");
+    output_samples[4][0] = 42.0F;
     require(!router.process(input, output, missing_source), "reject active route with null source");
+    require(output_samples[4][0] == 42.0F, "invalid block leaves output untouched");
 
-    std::cout << "All channel router tests passed\n";
+    std::cout << "All channel router tests passed\\n";
     return EXIT_SUCCESS;
 }
