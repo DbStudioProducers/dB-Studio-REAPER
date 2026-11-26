@@ -56,13 +56,34 @@ int main() {
 
     malformed = input;
     malformed.sample_rate_hz = std::numeric_limits<double>::infinity();
-    require(!router.process(malformed, output, matrix), "reject non-finite sample rate");
+    require(!router.process(malformed, output, matrix), "reject non-finite input sample rate");
+
+    malformed = input;
+    output.sample_rate_hz = 44100.0;
+    output_samples[0][0] = 77.0F;
+    require(!router.process(malformed, output, matrix), "reject mismatched sample rates");
+    require(output_samples[0][0] == 77.0F, "sample-rate mismatch leaves output untouched");
+    output.sample_rate_hz = input.sample_rate_hz;
 
     RoutingMatrix missing_source{};
     require(missing_source.setRoute(7, 2, 1.0F, 1.0F), "configure route with absent source");
     output_samples[4][0] = 42.0F;
     require(!router.process(input, output, missing_source), "reject active route with null source");
     require(output_samples[4][0] == 42.0F, "invalid block leaves output untouched");
+
+    std::array<float, frames> noisy_source{
+        0.5F, std::numeric_limits<float>::quiet_NaN(),
+        std::numeric_limits<float>::infinity(), -0.5F
+    };
+    AudioBlockView noisy_input = input;
+    noisy_input.channels[0] = noisy_source.data();
+    RoutingMatrix single_route{};
+    require(single_route.setRoute(0, 0, 1.0F, 1.0F), "configure noisy input route");
+    require(router.process(noisy_input, output, single_route), "process non-finite samples");
+    require(output_samples[0][0] == 0.5F, "preserve finite sample");
+    require(output_samples[0][1] == 0.0F, "mute NaN sample");
+    require(output_samples[0][2] == 0.0F, "mute infinite sample");
+    require(output_samples[0][3] == -0.5F, "preserve later finite sample");
 
     std::cout << "All channel router tests passed\n";
     return EXIT_SUCCESS;
